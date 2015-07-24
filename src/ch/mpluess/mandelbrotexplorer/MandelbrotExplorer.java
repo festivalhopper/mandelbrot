@@ -153,20 +153,34 @@ public class MandelbrotExplorer extends Application {
 						double cy = minY;
 						for (int y = 0; y < WIDTH; y++) {
 							// Bounded = member of the Mandelbrot set
-							boolean isBoundless = isBoundless(cx, cy);
-							if (!isBoundless) {
+							if (!isBoundless(cx, cy)) {
 								// black
 								image[x][y] = 0;
 							} else {
 								// white
 								image[x][y] = 1;
 							}
-							//System.out.println("Thread nr. " + threadNumber + " calculated pixel " + x + "/" + y + " to be " + image[x][y] + " (cx = " + cx + ", cy = " + cy + ")");
 							cy += stepY;
 						}
 						cx += THREADS * stepX;
 					}
 			    }
+			    
+			    private boolean isBoundless(double cx, double cy) {
+					double zx = 0;
+					double zy = 0;
+					int n = 0;
+					while ((zx * zx + zy * zy) < MAX_VALUE_SQUARE && n < MAX_N) {
+						double oldZx = zx;
+
+						// z * z + c
+						zx = zx * zx - zy * zy + cx;
+						zy = 2 * oldZx * zy + cy;
+
+						++n;
+					}
+					return n != MAX_N;
+				}
 			});
 		}
 		
@@ -201,37 +215,4 @@ public class MandelbrotExplorer extends Application {
 			}
 		}
 	}
-
-	private boolean isBoundless(double cx, double cy) {
-		double zx = 0;
-		double zy = 0;
-		int n = 0;
-		while ((zx * zx + zy * zy) < MAX_VALUE_SQUARE && n < MAX_N) {
-			double oldZx = zx;
-
-			// z * z + c
-			zx = zx * zx - zy * zy + cx;
-			zy = 2 * oldZx * zy + cy;
-
-			++n;
-		}
-		return n != MAX_N;
-	}
-	
-//	private void writeImageToFile() {
-//		PrintWriter writer;
-//		try {
-//			writer = new PrintWriter("Mandelbrot_ASCII_Art_" + threads + "_Threads.txt");
-//		} catch (FileNotFoundException e) {
-//			throw new RuntimeException(e);
-//		}
-//		for (int i = 0; i < image.length; i++) {
-//			for (int j = 0; j < image[i].length; j++) {
-//				writer.print(image[i][j]);
-//			}
-//			writer.println();
-//		}
-//		writer.close();
-//	}
-	
 }
