@@ -1,1 +1,1 @@
-# mandelbrot
+# Mandelbrot Explorer
