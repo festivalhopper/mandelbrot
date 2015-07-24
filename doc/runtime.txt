@@ -1,0 +1,2 @@
+1000 / 5000 calc only: 1 thread = 9311ms, 8 threads = 1410ms
+1000 / 5000 incl. image: 1 thread = 22256ms, 8 threads = 14709ms
