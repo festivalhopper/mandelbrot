@@ -12,55 +12,67 @@ import javafx.scene.input.MouseEvent;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
 
-//TODO Code refactoring
-//TODO Enhance selection usability. Allow selection from all directions.
-//TODO Make threading the right way.
-//TODO algorithm optimizations (see Wikipedia)
-//TODO Move left / right / up / down (e.g. by one page / image)
-//TODO Colors
-//TODO Choose random range for images, show slideshow.
-//TODO Save calculated images.
-//TODO Screenshot function
-//TODO (Enhance floating point precision.)
-//TODO (Matlab port)
 public class MandelbrotExplorer extends Application {
-	// Window size (square)
-	private static final int WINDOW_WIDTH = 1000;
+	private MandelbrotConfig config;
+	private MandelbrotState state;
+	private volatile int[][] image;
 	
-	// Image size (square, decides over the computing time needed)
-	// Image is then scaled down to window size.
-	
-	// Comparable in dense areas, clearly worse in sparse areas
-//	private static final int WIDTH = 3000;
-	
-	// Makes for a real nice image
-	private static final int WIDTH = 5000;
+	private static class MandelbrotConfig {
+		// Window size (square)
+		public final int windowWidth;
+		
+		// Image size (square, decides over the computing time needed)
+		// Image is then scaled down to window size.
+		public final int width;
 
-	// Algorithm parameters
-	private static final int MAX_N = 500;
-	private static final int MAX_VALUE_SQUARE = 4;
+		// Algorithm parameters
+		public final int maxN;
+		public final int maxValueSquare;
+		
+		public MandelbrotConfig() {
+			windowWidth = 1000;
+			
+			// Comparable in dense areas, clearly worse in sparse areas
+			//width = 3000;
+			//Makes for a real nice image
+			width = 5000;
+			
+			maxN = 500;
+			maxValueSquare = 4;
+		}
 
-	// Initial complex number range
-	private static double sceneXPressed;
-	private static double sceneYPressed;
+//		public MandelbrotConfig(int windowWidth, int width, int maxN,
+//				int maxValueSquare) {
+//			this.windowWidth = windowWidth;
+//			this.width = width;
+//			this.maxN = maxN;
+//			this.maxValueSquare = maxValueSquare;
+//		}
+	}
 	
-	// Standard Mandelbrot range
-	private static double minX = -2;
-	private static double maxX = 1;
-	private static double minY = -1.5;
-	private static double maxY = 1.5;
-	
-	// "Tal der Seepferdchen"
-//	private static double minX = -1;
-//	private static double maxX = 0;
-//	private static double minY = -0.5;
-//	private static double maxY = 0.5;
-	
-	// Test image inside "Tal der Seepferdchen"
-//	private static double minX = -0.7435069999999999;
-//	private static double maxX = -0.726671;
-//	private static double minY = -0.17215799999999995;
-//	private static double maxY = -0.15532199999999993;
+	private static class MandelbrotState {
+		// Initial complex number range
+		public double sceneXPressed;
+		public double sceneYPressed;
+		
+		// Standard Mandelbrot range
+		public double minX = -2;
+		public double maxX = 1;
+		public double minY = -1.5;
+		public double maxY = 1.5;
+		
+		// "Tal der Seepferdchen"
+//		public double state.minY = -1;
+//		public double maxX = 0;
+//		public double minY = -0.5;
+//		public double maxY = 0.5;
+		
+		// Test image inside "Tal der Seepferdchen"
+//		public double minX = -0.7435069999999999;
+//		public double maxX = -0.726671;
+//		public double minY = -0.17215799999999995;
+//		public double maxY = -0.15532199999999993;
+	}
 	
 	public static void main(String[] args) throws IOException {
 		launch(args);
@@ -68,45 +80,50 @@ public class MandelbrotExplorer extends Application {
 
 	@Override
 	public void start(Stage primaryStage) {
+		// Mandelbrot init
+		config = new MandelbrotConfig();
+		state = new MandelbrotState();
+		
+		// JavaFX init
 		primaryStage.setTitle("Mandelbrot");
 		Group root = new Group();
 		
-		Canvas canvas = new Canvas(WINDOW_WIDTH, WINDOW_WIDTH);
+		Canvas canvas = new Canvas(config.windowWidth, config.windowWidth);
 		GraphicsContext gc = canvas.getGraphicsContext2D();
-		initializeImage(gc);
+		updateImage(gc);
 		canvas.setOnMousePressed(new EventHandler<MouseEvent>() {
 			@Override
 			public void handle(MouseEvent event) {
-				sceneXPressed = event.getSceneX();
-				sceneYPressed = event.getSceneY();
+				state.sceneXPressed = event.getSceneX();
+				state.sceneYPressed = event.getSceneY();
 			}
 		});
 		canvas.setOnMouseReleased(new EventHandler<MouseEvent>() {
 			@Override
 			public void handle(MouseEvent event) {
-				double minXOrig = minX;
-				double minYOrig = minY;
+				double minXOrig = state.minX;
+				double minYOrig = state.minY;
 				double sceneXReleased = event.getSceneX();
 				double sceneYReleased = event.getSceneY();
 				
-				minX += (sceneXPressed + 1) / WINDOW_WIDTH * (maxX - minX);
-				minY += (sceneYPressed + 1) / WINDOW_WIDTH * (maxY - minY);
+				state.minX += (state.sceneXPressed + 1) / config.windowWidth * (state.maxX - state.minX);
+				state.minY += (state.sceneYPressed + 1) / config.windowWidth * (state.maxY - state.minY);
 				
 				// Adjust image to be square.
 				// Adjust to the short side of the rectangle drawn by the user.
-				if ((sceneXReleased - sceneXPressed) > (sceneYReleased - sceneYPressed)) {
-					maxX -= (WINDOW_WIDTH - (sceneYReleased - sceneYPressed + sceneXPressed) + 1) / WINDOW_WIDTH * (maxX - minXOrig);
-					maxY -= (WINDOW_WIDTH - sceneYReleased + 1) / WINDOW_WIDTH * (maxY - minYOrig);
+				if ((sceneXReleased - state.sceneXPressed) > (sceneYReleased - state.sceneYPressed)) {
+					state.maxX -= (config.windowWidth - (sceneYReleased - state.sceneYPressed + state.sceneXPressed) + 1) / config.windowWidth * (state.maxX - minXOrig);
+					state.maxY -= (config.windowWidth - sceneYReleased + 1) / config.windowWidth * (state.maxY - minYOrig);
 				}
-				else if ((sceneXReleased - sceneXPressed) < (sceneYReleased - sceneYPressed)) {
-					maxX -= (WINDOW_WIDTH - sceneXReleased + 1) / WINDOW_WIDTH * (maxX - minXOrig);
-					maxY -= (WINDOW_WIDTH - (sceneXReleased - sceneXPressed + sceneYPressed) + 1) / WINDOW_WIDTH * (maxY - minYOrig);
+				else if ((sceneXReleased - state.sceneXPressed) < (sceneYReleased - state.sceneYPressed)) {
+					state.maxX -= (config.windowWidth - sceneXReleased + 1) / config.windowWidth * (state.maxX - minXOrig);
+					state.maxY -= (config.windowWidth - (sceneXReleased - state.sceneXPressed + state.sceneYPressed) + 1) / config.windowWidth * (state.maxY - minYOrig);
 				}
 				else {
-					maxX -= (WINDOW_WIDTH - sceneXReleased + 1) / WINDOW_WIDTH * (maxX - minXOrig);
-					maxY -= (WINDOW_WIDTH - sceneYReleased + 1) / WINDOW_WIDTH * (maxY - minYOrig);
+					state.maxX -= (config.windowWidth - sceneXReleased + 1) / config.windowWidth * (state.maxX - minXOrig);
+					state.maxY -= (config.windowWidth - sceneYReleased + 1) / config.windowWidth * (state.maxY - minYOrig);
 				}
-				initializeImage(gc);
+				updateImage(gc);
 			}
 		});
 		
@@ -115,23 +132,23 @@ public class MandelbrotExplorer extends Application {
 		primaryStage.show();
 	}
 
-	private static void initializeImage(GraphicsContext gc) {
-		System.out.println("Creating image for parameters minX=[" + minX
-				+ "], maxX=[" + maxX + "], minY=[" + minY + "], maxY=[" + maxY
+	private void updateImage(GraphicsContext gc) {
+		System.out.println("Creating image for parameters minX=[" + state.minX
+				+ "], maxX=[" + state.maxX + "], minY=[" + state.minY + "], maxY=[" + state.maxY
 				+ "], stepX=[" + getStepX() + "], stepY=[" + getStepY() + "]");
 		long start = System.currentTimeMillis();
-		createImage(gc, minX, minY, getStepX(), getStepY());
+		image = new int[config.width][config.width];
+		createImage(gc);
 		System.out.println("Image created in " + (System.currentTimeMillis() - start) + "ms.");
 	}
 	
-	private static void createImage(GraphicsContext gc, double minX, double minY, double stepX, double stepY) {
-		assert WIDTH % WINDOW_WIDTH == 0;
+	private void createImage(GraphicsContext gc) {
+		assert config.width % config.windowWidth == 0;
 		
-		double cx = minX;
-		int[][] image = new int[WIDTH][WIDTH];
-		for (int x = 0; x < WIDTH; x++) {
-			double cy = minY;
-			for (int y = 0; y < WIDTH; y++) {
+		double cx = state.minX;
+		for (int x = 0; x < config.width; x++) {
+			double cy = state.minY;
+			for (int y = 0; y < config.width; y++) {
 				// Bounded = member of the Mandelbrot set
 				if (!isBoundless(cx, cy)) {
 					// black
@@ -140,20 +157,20 @@ public class MandelbrotExplorer extends Application {
 					// white
 					image[x][y] = 1;
 				}
-				cy += stepY;
+				cy += getStepY();
 			}
-			cx += stepX;
+			cx += getStepX();
 		}
 		
 		// Grayscale
-		// Example: WIDTH = 5000, WINDOW_WIDTH = 1000
+		// Example: config.width = 5000, config.windowWidth = 1000
 		// Pixel 0 / 0 is calculated the following way:
 		// Go through Pixels [0-4] / [0-4], calculate the average color (gray) from the black and white colors.
 		// Paint Pixel 0 / 0 with this calculated shade of gray.
-		int scaleFactor = WIDTH / WINDOW_WIDTH;
+		int scaleFactor = config.width / config.windowWidth;
 		int scaleFactorSquare = scaleFactor * scaleFactor;
-		for (int x = 0; x < WINDOW_WIDTH; x++) {
-			for (int y = 0; y < WINDOW_WIDTH; y++) {
+		for (int x = 0; x < config.windowWidth; x++) {
+			for (int y = 0; y < config.windowWidth; y++) {
 				int colorSum = 0;
 				for (int xImage = x * scaleFactor; xImage < (x * scaleFactor + scaleFactor); xImage++) {
 					for (int yImage = y * scaleFactor; yImage < (y * scaleFactor + scaleFactor); yImage++) {
@@ -167,11 +184,11 @@ public class MandelbrotExplorer extends Application {
 		}
 	}
 
-	private static boolean isBoundless(double cx, double cy) {
+	private boolean isBoundless(double cx, double cy) {
 		double zx = 0;
 		double zy = 0;
 		int n = 0;
-		while ((zx * zx + zy * zy) < MAX_VALUE_SQUARE && n < MAX_N) {
+		while ((zx * zx + zy * zy) < config.maxValueSquare && n < config.maxN) {
 			double oldZx = zx;
 
 			// z * z + c
@@ -180,15 +197,15 @@ public class MandelbrotExplorer extends Application {
 
 			++n;
 		}
-		return n != MAX_N;
+		return n != config.maxN;
 	}
 
-	private static double getStepX() {
-		return (maxX - minX) / WIDTH;
+	private double getStepX() {
+		return (state.maxX - state.minX) / config.width;
 	}
 	
-	private static double getStepY() {
-		return (maxY - minY) / WIDTH;
+	private double getStepY() {
+		return (state.maxY - state.minY) / config.width;
 	}
 	
 }
