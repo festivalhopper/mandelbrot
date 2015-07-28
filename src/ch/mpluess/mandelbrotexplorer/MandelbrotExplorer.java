@@ -1,5 +1,12 @@
 package ch.mpluess.mandelbrotexplorer;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -125,7 +132,7 @@ public class MandelbrotExplorer extends Application {
 		primaryStage.show();
 	}
 	
-	public void updateSteps() {
+	private void updateSteps() {
 		stepX = (maxX - minX) / WIDTH;
 		stepY = (maxY - minY) / WIDTH;
 	}
@@ -194,25 +201,86 @@ public class MandelbrotExplorer extends Application {
 			throw new RuntimeException(e);
 		}
 		
-		// Grayscale
-		// Example: width = 5000, windowWidth = 1000
-		// Pixel 0 / 0 is calculated the following way:
-		// Go through Pixels [0-4] / [0-4], calculate the average color (gray) from the black and white colors.
-		// Paint Pixel 0 / 0 with this calculated shade of gray.
-		int scaleFactor = WIDTH / WINDOW_WIDTH;
-		int scaleFactorSquare = scaleFactor * scaleFactor;
+		//TODO scheint gar nicht schneller zu sein
+		int[][] finalImage;
+		if (isImageCached()) {
+			System.out.println("Reading image from cache.");
+			finalImage = readCachedImage();
+		}
+		else {
+			// Grayscale
+			// Example: width = 5000, windowWidth = 1000
+			// Pixel 0 / 0 is calculated the following way:
+			// Go through Pixels [0-4] / [0-4], calculate the average color (gray) from the black and white colors.
+			// Paint Pixel 0 / 0 with this calculated shade of gray.
+			int scaleFactor = WIDTH / WINDOW_WIDTH;
+			int scaleFactorSquare = scaleFactor * scaleFactor;
+			finalImage = new int[WINDOW_WIDTH][WINDOW_WIDTH];
+			for (int x = 0; x < WINDOW_WIDTH; x++) {
+				for (int y = 0; y < WINDOW_WIDTH; y++) {
+					int colorSum = 0;
+					for (int xImage = x * scaleFactor; xImage < (x * scaleFactor + scaleFactor); xImage++) {
+						for (int yImage = y * scaleFactor; yImage < (y * scaleFactor + scaleFactor); yImage++) {
+							colorSum += image[xImage][yImage];
+						}
+					}
+					int colorRgb = (int)(((double)colorSum) / scaleFactorSquare * 255);
+					finalImage[x][y] = colorRgb;
+				}
+			}
+		}
+		
 		for (int x = 0; x < WINDOW_WIDTH; x++) {
 			for (int y = 0; y < WINDOW_WIDTH; y++) {
-				int colorSum = 0;
-				for (int xImage = x * scaleFactor; xImage < (x * scaleFactor + scaleFactor); xImage++) {
-					for (int yImage = y * scaleFactor; yImage < (y * scaleFactor + scaleFactor); yImage++) {
-						colorSum += image[xImage][yImage];
-					}
-				}
-				int colorRgb = (int)(((double)colorSum) / scaleFactorSquare * 255);
+				int colorRgb = finalImage[x][y];
 				gc.setFill(Color.rgb(colorRgb, colorRgb, colorRgb));
 				gc.fillRect(x, y, 1, 1);
 			}
 		}
+		
+		cacheImage(finalImage);
+	}
+	
+	private boolean isImageCached() {
+		return new File(getCachedImagePath()).exists();
+	}
+	
+	private boolean isImageCached(String path) {
+		return new File(path).exists();
+	}
+	
+	private void cacheImage(int[][] image) {
+		String path = getCachedImagePath();
+		if (!isImageCached(path)) {
+			System.out.println("Caching image.");
+			try {
+				FileOutputStream fos = new FileOutputStream(path);
+				ObjectOutputStream out = new ObjectOutputStream(fos);
+				out.writeObject(image);
+				out.flush();
+				out.close();
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			}
+		}
+	}
+	
+	private int[][] readCachedImage() {
+		FileInputStream fis;
+		try {
+			fis = new FileInputStream(getCachedImagePath());
+			ObjectInputStream in = new ObjectInputStream(fis);
+			return (int[][])in.readObject();
+		} catch (FileNotFoundException e) {
+			throw new RuntimeException(e);
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		} catch (ClassNotFoundException e) {
+			throw new RuntimeException(e);
+		}
+	}
+	
+	private String getCachedImagePath() {
+		return "image_cache/" + WIDTH + "_" + minX + "_" + maxX + "_" + minY + "_" + maxY + ".dat";
 	}
 }
