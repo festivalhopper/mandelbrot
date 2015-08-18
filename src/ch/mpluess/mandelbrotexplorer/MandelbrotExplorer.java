@@ -42,6 +42,9 @@ public class MandelbrotExplorer extends Application {
 	private final int THREADS = 8;
 	private final int TIMEOUT_SECONDS = 60;
 	
+	// Caching
+	private final boolean DO_CACHING = false;
+	
 	////////
 	// State
 	
@@ -150,6 +153,7 @@ public class MandelbrotExplorer extends Application {
 	private void createImage(GraphicsContext gc) {
 		assert WIDTH % WINDOW_WIDTH == 0;
 		
+		// TODO more slices than threads (better balancing)
 		ExecutorService executorService = Executors.newFixedThreadPool(THREADS);
 		for (int i = 0; i < THREADS; i++) {
 			final int threadNumber = i;
@@ -201,14 +205,15 @@ public class MandelbrotExplorer extends Application {
 			throw new RuntimeException(e);
 		}
 		
-		//TODO scheint gar nicht schneller zu sein
+		//TODO Caching currently not faster than recalculating
 		int[][] finalImage;
-		if (isImageCached()) {
+		if (DO_CACHING && isImageCached()) {
 			System.out.println("Reading image from cache.");
 			finalImage = readCachedImage();
 		}
 		else {
 			// Grayscale
+			// Approximate runtime for width = 5000, windowWidth = 1000: 50ms
 			// Example: width = 5000, windowWidth = 1000
 			// Pixel 0 / 0 is calculated the following way:
 			// Go through Pixels [0-4] / [0-4], calculate the average color (gray) from the black and white colors.
@@ -238,7 +243,9 @@ public class MandelbrotExplorer extends Application {
 			}
 		}
 		
-		cacheImage(finalImage);
+		if (DO_CACHING) {
+			cacheImage(finalImage);
+		}
 	}
 	
 	private boolean isImageCached() {
@@ -270,7 +277,9 @@ public class MandelbrotExplorer extends Application {
 		try {
 			fis = new FileInputStream(getCachedImagePath());
 			ObjectInputStream in = new ObjectInputStream(fis);
-			return (int[][])in.readObject();
+			int[][] cachedImage = (int[][])in.readObject();
+			in.close();
+			return cachedImage;
 		} catch (FileNotFoundException e) {
 			throw new RuntimeException(e);
 		} catch (IOException e) {
