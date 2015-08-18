@@ -7,6 +7,8 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
+import java.util.EmptyStackException;
+import java.util.Stack;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -17,6 +19,7 @@ import javafx.scene.Group;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
@@ -48,31 +51,33 @@ public class MandelbrotExplorer extends Application {
 	////////
 	// State
 	
-	public double sceneXPressed;
-	public double sceneYPressed;
+	private double sceneXPressed;
+	private double sceneYPressed;
 	
 	// Initial complex number range
 	
 	// Standard Mandelbrot range
-	public double minX = -2;
-	public double maxX = 1;
-	public double minY = -1.5;
-	public double maxY = 1.5;
+	private double minX = -2;
+	private double maxX = 1;
+	private double minY = -1.5;
+	private double maxY = 1.5;
 	
 	// "Tal der Seepferdchen"
-//	public double minX = -1;
-//	public double maxX = 0;
-//	public double minY = -0.5;
-//	public double maxY = 0.5;
+//	private double minX = -1;
+//	private double maxX = 0;
+//	private double minY = -0.5;
+//	private double maxY = 0.5;
 	
 	// Test image inside "Tal der Seepferdchen"
-//	public double minX = -0.7435069999999999;
-//	public double maxX = -0.726671;
-//	public double minY = -0.17215799999999995;
-//	public double maxY = -0.15532199999999993;
+//	private double minX = -0.7435069999999999;
+//	private double maxX = -0.726671;
+//	private double minY = -0.17215799999999995;
+//	private double maxY = -0.15532199999999993;
 	
-	public double stepX;
-	public double stepY;
+	private double stepX;
+	private double stepY;
+	
+	private Stack<MandelbrotState> history = new Stack<MandelbrotState>();
 	
 	private volatile int[][] image;
 	
@@ -95,38 +100,64 @@ public class MandelbrotExplorer extends Application {
 		canvas.setOnMousePressed(new EventHandler<MouseEvent>() {
 			@Override
 			public void handle(MouseEvent event) {
-				sceneXPressed = event.getSceneX();
-				sceneYPressed = event.getSceneY();
+				if (event.getButton() == MouseButton.PRIMARY) {
+					sceneXPressed = event.getSceneX();
+					sceneYPressed = event.getSceneY();
+				}
 			}
 		});
 		canvas.setOnMouseReleased(new EventHandler<MouseEvent>() {
 			@Override
 			public void handle(MouseEvent event) {
-				double minXOrig = minX;
-				double minYOrig = minY;
-				double sceneXReleased = event.getSceneX();
-				double sceneYReleased = event.getSceneY();
-				
-				minX += (sceneXPressed + 1) / WINDOW_WIDTH * (maxX - minX);
-				minY += (sceneYPressed + 1) / WINDOW_WIDTH * (maxY - minY);
-				
-				// Adjust image to be square.
-				// Adjust to the short side of the rectangle drawn by the user.
-				if ((sceneXReleased - sceneXPressed) > (sceneYReleased - sceneYPressed)) {
-					maxX -= (WINDOW_WIDTH - (sceneYReleased - sceneYPressed + sceneXPressed) + 1) / WINDOW_WIDTH * (maxX - minXOrig);
-					maxY -= (WINDOW_WIDTH - sceneYReleased + 1) / WINDOW_WIDTH * (maxY - minYOrig);
+				if (event.getButton() == MouseButton.PRIMARY) {
+					history.push(new MandelbrotState(minX, maxX, minY, maxY, stepX, stepY));
+					
+					double minXOrig = minX;
+					double minYOrig = minY;
+					double sceneXReleased = event.getSceneX();
+					double sceneYReleased = event.getSceneY();
+					
+					minX += (sceneXPressed + 1) / WINDOW_WIDTH * (maxX - minX);
+					minY += (sceneYPressed + 1) / WINDOW_WIDTH * (maxY - minY);
+					
+					// Adjust image to be square.
+					// Adjust to the short side of the rectangle drawn by the user.
+					if ((sceneXReleased - sceneXPressed) > (sceneYReleased - sceneYPressed)) {
+						maxX -= (WINDOW_WIDTH - (sceneYReleased - sceneYPressed + sceneXPressed) + 1) / WINDOW_WIDTH * (maxX - minXOrig);
+						maxY -= (WINDOW_WIDTH - sceneYReleased + 1) / WINDOW_WIDTH * (maxY - minYOrig);
+					}
+					else if ((sceneXReleased - sceneXPressed) < (sceneYReleased - sceneYPressed)) {
+						maxX -= (WINDOW_WIDTH - sceneXReleased + 1) / WINDOW_WIDTH * (maxX - minXOrig);
+						maxY -= (WINDOW_WIDTH - (sceneXReleased - sceneXPressed + sceneYPressed) + 1) / WINDOW_WIDTH * (maxY - minYOrig);
+					}
+					else {
+						maxX -= (WINDOW_WIDTH - sceneXReleased + 1) / WINDOW_WIDTH * (maxX - minXOrig);
+						maxY -= (WINDOW_WIDTH - sceneYReleased + 1) / WINDOW_WIDTH * (maxY - minYOrig);
+					}
+					
+					updateSteps();
+					updateImage(gc);
 				}
-				else if ((sceneXReleased - sceneXPressed) < (sceneYReleased - sceneYPressed)) {
-					maxX -= (WINDOW_WIDTH - sceneXReleased + 1) / WINDOW_WIDTH * (maxX - minXOrig);
-					maxY -= (WINDOW_WIDTH - (sceneXReleased - sceneXPressed + sceneYPressed) + 1) / WINDOW_WIDTH * (maxY - minYOrig);
+			}
+		});
+		canvas.setOnMouseClicked(new EventHandler<MouseEvent>() {
+			@Override
+			public void handle(MouseEvent event) {
+				if (event.getButton() == MouseButton.SECONDARY) {
+					try {
+						MandelbrotState state = history.pop();
+						minX = state.minX;
+						maxX = state.maxX;
+						minY = state.minY;
+						maxY = state.maxY;
+						stepX = state.stepX;
+						stepY = state.stepY;
+						updateImage(gc);
+					}
+					catch (EmptyStackException e) {
+						return;
+					}
 				}
-				else {
-					maxX -= (WINDOW_WIDTH - sceneXReleased + 1) / WINDOW_WIDTH * (maxX - minXOrig);
-					maxY -= (WINDOW_WIDTH - sceneYReleased + 1) / WINDOW_WIDTH * (maxY - minYOrig);
-				}
-				
-				updateSteps();
-				updateImage(gc);
 			}
 		});
 		
@@ -146,14 +177,13 @@ public class MandelbrotExplorer extends Application {
 				+ "], stepX=[" + stepX + "], stepY=[" + stepY + "]");
 		long start = System.currentTimeMillis();
 		image = new int[WIDTH][WIDTH];
-		createImage(gc);
+		calculateImage(gc);
 		System.out.println("Image created in " + (System.currentTimeMillis() - start) + "ms.");
 	}
 	
-	private void createImage(GraphicsContext gc) {
+	private void calculateImage(GraphicsContext gc) {
 		assert WIDTH % WINDOW_WIDTH == 0;
 		
-		// TODO more slices than threads (better balancing)
 		ExecutorService executorService = Executors.newFixedThreadPool(THREADS);
 		for (int i = 0; i < THREADS; i++) {
 			final int threadNumber = i;
