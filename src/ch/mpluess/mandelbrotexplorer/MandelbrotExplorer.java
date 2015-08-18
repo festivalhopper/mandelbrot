@@ -1,18 +1,45 @@
+/**
+ * @author Michel Pluess
+ * 
+ * Usage:
+ * - Make a square-shaped selection with the left mouse button, going from
+ *   top-left to bottom-right of the area you want to enlarge. New image
+ *   will be calculated and displayed.
+ * - Right-click to get back to the last image (you can go back until the initial
+ *   image if you want to).
+ * - Type "s" to save the current image to the "screenshots" directory.
+ */
+
 package ch.mpluess.mandelbrotexplorer;
 
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.util.EmptyStackException;
+import java.util.Stack;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import javafx.application.Application;
+import javafx.embed.swing.SwingFXUtils;
 import javafx.event.EventHandler;
 import javafx.scene.Group;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.image.WritableImage;
+import javafx.scene.input.KeyEvent;
+import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
+
+import javax.imageio.ImageIO;
 
 public class MandelbrotExplorer extends Application {
 	/////////
@@ -35,34 +62,39 @@ public class MandelbrotExplorer extends Application {
 	private final int THREADS = 8;
 	private final int TIMEOUT_SECONDS = 60;
 	
+	// Caching
+	private final boolean DO_CACHING = false;
+	
 	////////
 	// State
 	
-	public double sceneXPressed;
-	public double sceneYPressed;
+	private double sceneXPressed;
+	private double sceneYPressed;
 	
 	// Initial complex number range
 	
 	// Standard Mandelbrot range
-	public double minX = -2;
-	public double maxX = 1;
-	public double minY = -1.5;
-	public double maxY = 1.5;
+	private double minX = -2;
+	private double maxX = 1;
+	private double minY = -1.5;
+	private double maxY = 1.5;
 	
 	// "Tal der Seepferdchen"
-//	public double minX = -1;
-//	public double maxX = 0;
-//	public double minY = -0.5;
-//	public double maxY = 0.5;
+//	private double minX = -1;
+//	private double maxX = 0;
+//	private double minY = -0.5;
+//	private double maxY = 0.5;
 	
 	// Test image inside "Tal der Seepferdchen"
-//	public double minX = -0.7435069999999999;
-//	public double maxX = -0.726671;
-//	public double minY = -0.17215799999999995;
-//	public double maxY = -0.15532199999999993;
+//	private double minX = -0.7435069999999999;
+//	private double maxX = -0.726671;
+//	private double minY = -0.17215799999999995;
+//	private double maxY = -0.15532199999999993;
 	
-	public double stepX;
-	public double stepY;
+	private double stepX;
+	private double stepY;
+	
+	private Stack<MandelbrotState> history = new Stack<MandelbrotState>();
 	
 	private volatile int[][] image;
 	
@@ -82,50 +114,96 @@ public class MandelbrotExplorer extends Application {
 		Canvas canvas = new Canvas(WINDOW_WIDTH, WINDOW_WIDTH);
 		GraphicsContext gc = canvas.getGraphicsContext2D();
 		updateImage(gc);
+		
 		canvas.setOnMousePressed(new EventHandler<MouseEvent>() {
 			@Override
 			public void handle(MouseEvent event) {
-				sceneXPressed = event.getSceneX();
-				sceneYPressed = event.getSceneY();
+				if (event.getButton() == MouseButton.PRIMARY) {
+					sceneXPressed = event.getSceneX();
+					sceneYPressed = event.getSceneY();
+				}
 			}
 		});
 		canvas.setOnMouseReleased(new EventHandler<MouseEvent>() {
 			@Override
 			public void handle(MouseEvent event) {
-				double minXOrig = minX;
-				double minYOrig = minY;
-				double sceneXReleased = event.getSceneX();
-				double sceneYReleased = event.getSceneY();
-				
-				minX += (sceneXPressed + 1) / WINDOW_WIDTH * (maxX - minX);
-				minY += (sceneYPressed + 1) / WINDOW_WIDTH * (maxY - minY);
-				
-				// Adjust image to be square.
-				// Adjust to the short side of the rectangle drawn by the user.
-				if ((sceneXReleased - sceneXPressed) > (sceneYReleased - sceneYPressed)) {
-					maxX -= (WINDOW_WIDTH - (sceneYReleased - sceneYPressed + sceneXPressed) + 1) / WINDOW_WIDTH * (maxX - minXOrig);
-					maxY -= (WINDOW_WIDTH - sceneYReleased + 1) / WINDOW_WIDTH * (maxY - minYOrig);
+				if (event.getButton() == MouseButton.PRIMARY) {
+					history.push(new MandelbrotState(minX, maxX, minY, maxY, stepX, stepY));
+					
+					double minXOrig = minX;
+					double minYOrig = minY;
+					double sceneXReleased = event.getSceneX();
+					double sceneYReleased = event.getSceneY();
+					
+					minX += (sceneXPressed + 1) / WINDOW_WIDTH * (maxX - minX);
+					minY += (sceneYPressed + 1) / WINDOW_WIDTH * (maxY - minY);
+					
+					// Adjust image to be square.
+					// Adjust to the short side of the rectangle drawn by the user.
+					if ((sceneXReleased - sceneXPressed) > (sceneYReleased - sceneYPressed)) {
+						maxX -= (WINDOW_WIDTH - (sceneYReleased - sceneYPressed + sceneXPressed) + 1) / WINDOW_WIDTH * (maxX - minXOrig);
+						maxY -= (WINDOW_WIDTH - sceneYReleased + 1) / WINDOW_WIDTH * (maxY - minYOrig);
+					}
+					else if ((sceneXReleased - sceneXPressed) < (sceneYReleased - sceneYPressed)) {
+						maxX -= (WINDOW_WIDTH - sceneXReleased + 1) / WINDOW_WIDTH * (maxX - minXOrig);
+						maxY -= (WINDOW_WIDTH - (sceneXReleased - sceneXPressed + sceneYPressed) + 1) / WINDOW_WIDTH * (maxY - minYOrig);
+					}
+					else {
+						maxX -= (WINDOW_WIDTH - sceneXReleased + 1) / WINDOW_WIDTH * (maxX - minXOrig);
+						maxY -= (WINDOW_WIDTH - sceneYReleased + 1) / WINDOW_WIDTH * (maxY - minYOrig);
+					}
+					
+					updateSteps();
+					updateImage(gc);
 				}
-				else if ((sceneXReleased - sceneXPressed) < (sceneYReleased - sceneYPressed)) {
-					maxX -= (WINDOW_WIDTH - sceneXReleased + 1) / WINDOW_WIDTH * (maxX - minXOrig);
-					maxY -= (WINDOW_WIDTH - (sceneXReleased - sceneXPressed + sceneYPressed) + 1) / WINDOW_WIDTH * (maxY - minYOrig);
-				}
-				else {
-					maxX -= (WINDOW_WIDTH - sceneXReleased + 1) / WINDOW_WIDTH * (maxX - minXOrig);
-					maxY -= (WINDOW_WIDTH - sceneYReleased + 1) / WINDOW_WIDTH * (maxY - minYOrig);
-				}
-				
-				updateSteps();
-				updateImage(gc);
 			}
 		});
-		
+		canvas.setOnMouseClicked(new EventHandler<MouseEvent>() {
+			@Override
+			public void handle(MouseEvent event) {
+				// go back to last image
+				if (event.getButton() == MouseButton.SECONDARY) {
+					try {
+						MandelbrotState state = history.pop();
+						minX = state.minX;
+						maxX = state.maxX;
+						minY = state.minY;
+						maxY = state.maxY;
+						stepX = state.stepX;
+						stepY = state.stepY;
+						updateImage(gc);
+					}
+					catch (EmptyStackException e) {
+						return;
+					}
+				}
+			}
+		});
 		root.getChildren().add(canvas);
-		primaryStage.setScene(new Scene(root));
+		
+		Scene scene = new Scene(root);
+		scene.setOnKeyTyped(new EventHandler<KeyEvent>() {
+            public void handle(KeyEvent event) {
+            	// screenshot
+            	if (event.getCharacter().equalsIgnoreCase("s")) {
+            		WritableImage img = new WritableImage(WINDOW_WIDTH, WINDOW_WIDTH);
+					gc.getCanvas().snapshot(null, img);
+					File file = new File("screenshots/" + System.currentTimeMillis() + ".png");
+					try {
+						ImageIO.write(SwingFXUtils.fromFXImage(img, null), "png", file);
+						System.out.println("Screenshot saved to file " + file.getAbsolutePath());
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+            	}
+            }
+		});
+		
+		primaryStage.setScene(scene);
 		primaryStage.show();
 	}
 	
-	public void updateSteps() {
+	private void updateSteps() {
 		stepX = (maxX - minX) / WIDTH;
 		stepY = (maxY - minY) / WIDTH;
 	}
@@ -136,11 +214,11 @@ public class MandelbrotExplorer extends Application {
 				+ "], stepX=[" + stepX + "], stepY=[" + stepY + "]");
 		long start = System.currentTimeMillis();
 		image = new int[WIDTH][WIDTH];
-		createImage(gc);
+		calculateImage(gc);
 		System.out.println("Image created in " + (System.currentTimeMillis() - start) + "ms.");
 	}
 	
-	private void createImage(GraphicsContext gc) {
+	private void calculateImage(GraphicsContext gc) {
 		assert WIDTH % WINDOW_WIDTH == 0;
 		
 		ExecutorService executorService = Executors.newFixedThreadPool(THREADS);
@@ -153,20 +231,34 @@ public class MandelbrotExplorer extends Application {
 						double cy = minY;
 						for (int y = 0; y < WIDTH; y++) {
 							// Bounded = member of the Mandelbrot set
-							boolean isBoundless = isBoundless(cx, cy);
-							if (!isBoundless) {
+							if (!isBoundless(cx, cy)) {
 								// black
 								image[x][y] = 0;
 							} else {
 								// white
 								image[x][y] = 1;
 							}
-							//System.out.println("Thread nr. " + threadNumber + " calculated pixel " + x + "/" + y + " to be " + image[x][y] + " (cx = " + cx + ", cy = " + cy + ")");
 							cy += stepY;
 						}
 						cx += THREADS * stepX;
 					}
 			    }
+			    
+			    private boolean isBoundless(double cx, double cy) {
+					double zx = 0;
+					double zy = 0;
+					int n = 0;
+					while ((zx * zx + zy * zy) < MAX_VALUE_SQUARE && n < MAX_N) {
+						double oldZx = zx;
+
+						// z * z + c
+						zx = zx * zx - zy * zy + cx;
+						zy = 2 * oldZx * zy + cy;
+
+						++n;
+					}
+					return n != MAX_N;
+				}
 			});
 		}
 		
@@ -180,58 +272,91 @@ public class MandelbrotExplorer extends Application {
 			throw new RuntimeException(e);
 		}
 		
-		// Grayscale
-		// Example: width = 5000, windowWidth = 1000
-		// Pixel 0 / 0 is calculated the following way:
-		// Go through Pixels [0-4] / [0-4], calculate the average color (gray) from the black and white colors.
-		// Paint Pixel 0 / 0 with this calculated shade of gray.
-		int scaleFactor = WIDTH / WINDOW_WIDTH;
-		int scaleFactorSquare = scaleFactor * scaleFactor;
+		//TODO Caching currently not faster than recalculating
+		int[][] finalImage;
+		if (DO_CACHING && isImageCached()) {
+			System.out.println("Reading image from cache.");
+			finalImage = readCachedImage();
+		}
+		else {
+			// Grayscale
+			// Approximate runtime for width = 5000, windowWidth = 1000: 50ms
+			// Example: width = 5000, windowWidth = 1000
+			// Pixel 0 / 0 is calculated the following way:
+			// Go through Pixels [0-4] / [0-4], calculate the average color (gray) from the black and white colors.
+			// Paint Pixel 0 / 0 with this calculated shade of gray.
+			int scaleFactor = WIDTH / WINDOW_WIDTH;
+			int scaleFactorSquare = scaleFactor * scaleFactor;
+			finalImage = new int[WINDOW_WIDTH][WINDOW_WIDTH];
+			for (int x = 0; x < WINDOW_WIDTH; x++) {
+				for (int y = 0; y < WINDOW_WIDTH; y++) {
+					int colorSum = 0;
+					for (int xImage = x * scaleFactor; xImage < (x * scaleFactor + scaleFactor); xImage++) {
+						for (int yImage = y * scaleFactor; yImage < (y * scaleFactor + scaleFactor); yImage++) {
+							colorSum += image[xImage][yImage];
+						}
+					}
+					int colorRgb = (int)(((double)colorSum) / scaleFactorSquare * 255);
+					finalImage[x][y] = colorRgb;
+				}
+			}
+		}
+		
 		for (int x = 0; x < WINDOW_WIDTH; x++) {
 			for (int y = 0; y < WINDOW_WIDTH; y++) {
-				int colorSum = 0;
-				for (int xImage = x * scaleFactor; xImage < (x * scaleFactor + scaleFactor); xImage++) {
-					for (int yImage = y * scaleFactor; yImage < (y * scaleFactor + scaleFactor); yImage++) {
-						colorSum += image[xImage][yImage];
-					}
-				}
-				int colorRgb = (int)(((double)colorSum) / scaleFactorSquare * 255);
+				int colorRgb = finalImage[x][y];
 				gc.setFill(Color.rgb(colorRgb, colorRgb, colorRgb));
 				gc.fillRect(x, y, 1, 1);
 			}
 		}
-	}
-
-	private boolean isBoundless(double cx, double cy) {
-		double zx = 0;
-		double zy = 0;
-		int n = 0;
-		while ((zx * zx + zy * zy) < MAX_VALUE_SQUARE && n < MAX_N) {
-			double oldZx = zx;
-
-			// z * z + c
-			zx = zx * zx - zy * zy + cx;
-			zy = 2 * oldZx * zy + cy;
-
-			++n;
+		
+		if (DO_CACHING) {
+			cacheImage(finalImage);
 		}
-		return n != MAX_N;
 	}
 	
-//	private void writeImageToFile() {
-//		PrintWriter writer;
-//		try {
-//			writer = new PrintWriter("Mandelbrot_ASCII_Art_" + threads + "_Threads.txt");
-//		} catch (FileNotFoundException e) {
-//			throw new RuntimeException(e);
-//		}
-//		for (int i = 0; i < image.length; i++) {
-//			for (int j = 0; j < image[i].length; j++) {
-//				writer.print(image[i][j]);
-//			}
-//			writer.println();
-//		}
-//		writer.close();
-//	}
+	private boolean isImageCached() {
+		return new File(getCachedImagePath()).exists();
+	}
 	
+	private boolean isImageCached(String path) {
+		return new File(path).exists();
+	}
+	
+	private void cacheImage(int[][] image) {
+		String path = getCachedImagePath();
+		if (!isImageCached(path)) {
+			System.out.println("Caching image.");
+			try {
+				FileOutputStream fos = new FileOutputStream(path);
+				ObjectOutputStream out = new ObjectOutputStream(fos);
+				out.writeObject(image);
+				out.flush();
+				out.close();
+			} catch (IOException e) {
+				throw new RuntimeException(e);
+			}
+		}
+	}
+	
+	private int[][] readCachedImage() {
+		FileInputStream fis;
+		try {
+			fis = new FileInputStream(getCachedImagePath());
+			ObjectInputStream in = new ObjectInputStream(fis);
+			int[][] cachedImage = (int[][])in.readObject();
+			in.close();
+			return cachedImage;
+		} catch (FileNotFoundException e) {
+			throw new RuntimeException(e);
+		} catch (IOException e) {
+			throw new RuntimeException(e);
+		} catch (ClassNotFoundException e) {
+			throw new RuntimeException(e);
+		}
+	}
+	
+	private String getCachedImagePath() {
+		return "image_cache/" + WIDTH + "_" + minX + "_" + maxX + "_" + minY + "_" + maxY + ".dat";
+	}
 }
