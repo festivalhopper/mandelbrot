@@ -1,3 +1,15 @@
+/**
+ * @author Michel Pluess
+ * 
+ * Usage:
+ * - Make a square-shaped selection with the left mouse button, going from
+ *   top-left to bottom-right of the area you want to enlarge. New image
+ *   will be calculated and displayed.
+ * - Right-click to get back to the last image (you can go back until the initial
+ *   image if you want to).
+ * - Type "s" to save the current image to the "screenshots" directory.
+ */
+
 package ch.mpluess.mandelbrotexplorer;
 
 import java.io.File;
@@ -14,15 +26,20 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import javafx.application.Application;
+import javafx.embed.swing.SwingFXUtils;
 import javafx.event.EventHandler;
 import javafx.scene.Group;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.image.WritableImage;
+import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
 import javafx.scene.paint.Color;
 import javafx.stage.Stage;
+
+import javax.imageio.ImageIO;
 
 public class MandelbrotExplorer extends Application {
 	/////////
@@ -97,6 +114,7 @@ public class MandelbrotExplorer extends Application {
 		Canvas canvas = new Canvas(WINDOW_WIDTH, WINDOW_WIDTH);
 		GraphicsContext gc = canvas.getGraphicsContext2D();
 		updateImage(gc);
+		
 		canvas.setOnMousePressed(new EventHandler<MouseEvent>() {
 			@Override
 			public void handle(MouseEvent event) {
@@ -143,6 +161,7 @@ public class MandelbrotExplorer extends Application {
 		canvas.setOnMouseClicked(new EventHandler<MouseEvent>() {
 			@Override
 			public void handle(MouseEvent event) {
+				// go back to last image
 				if (event.getButton() == MouseButton.SECONDARY) {
 					try {
 						MandelbrotState state = history.pop();
@@ -160,9 +179,27 @@ public class MandelbrotExplorer extends Application {
 				}
 			}
 		});
-		
 		root.getChildren().add(canvas);
-		primaryStage.setScene(new Scene(root));
+		
+		Scene scene = new Scene(root);
+		scene.setOnKeyTyped(new EventHandler<KeyEvent>() {
+            public void handle(KeyEvent event) {
+            	// screenshot
+            	if (event.getCharacter().equalsIgnoreCase("s")) {
+            		WritableImage img = new WritableImage(WINDOW_WIDTH, WINDOW_WIDTH);
+					gc.getCanvas().snapshot(null, img);
+					File file = new File("screenshots/" + System.currentTimeMillis() + ".png");
+					try {
+						ImageIO.write(SwingFXUtils.fromFXImage(img, null), "png", file);
+						System.out.println("Screenshot saved to file " + file.getAbsolutePath());
+					} catch (IOException e) {
+						e.printStackTrace();
+					}
+            	}
+            }
+		});
+		
+		primaryStage.setScene(scene);
 		primaryStage.show();
 	}
 	
