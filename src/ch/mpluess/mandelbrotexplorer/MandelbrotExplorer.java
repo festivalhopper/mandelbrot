@@ -14,7 +14,6 @@ package ch.mpluess.mandelbrotexplorer;
 
 import java.io.File;
 import java.io.IOException;
-import java.util.EmptyStackException;
 import java.util.Stack;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -67,7 +66,8 @@ public class MandelbrotExplorer extends Application {
 	private Rectangle selection;
 	private boolean selectionStarted = false;
 	
-	// Initial complex number range
+	// Initial / currently active complex number range
+	// Not using the MandelbrotState class here for performance reasons.
 	
 	// Standard Mandelbrot range
 	private double minX = -2;
@@ -104,9 +104,6 @@ public class MandelbrotExplorer extends Application {
 		updateSteps();
 		
 		// JavaFX init
-		primaryStage.setTitle("Mandelbrot");
-		Group root = new Group();
-		
 		Canvas canvas = new Canvas(WINDOW_WIDTH, WINDOW_WIDTH);
 		GraphicsContext gc = canvas.getGraphicsContext2D();
 		updateImage(gc);
@@ -119,6 +116,9 @@ public class MandelbrotExplorer extends Application {
 		selection = new Rectangle();
 		selection.setFill(Color.TRANSPARENT);
 		selection.setStroke(Color.GREY);
+		
+		Group root = new Group();
+		root.getChildren().addAll(canvas, glassPane);
 		
 		canvas.setOnMousePressed(new EventHandler<MouseEvent>() {
 			@Override
@@ -216,8 +216,6 @@ public class MandelbrotExplorer extends Application {
 			}
 		});
 		
-		root.getChildren().addAll(canvas, glassPane);
-		
 		Scene scene = new Scene(root);
 		scene.setOnKeyTyped(new EventHandler<KeyEvent>() {
             public void handle(KeyEvent event) {
@@ -236,6 +234,7 @@ public class MandelbrotExplorer extends Application {
             }
 		});
 		
+		primaryStage.setTitle("Mandelbrot Explorer");
 		primaryStage.setScene(scene);
 		primaryStage.show();
 	}
@@ -310,12 +309,18 @@ public class MandelbrotExplorer extends Application {
 			throw new RuntimeException(e);
 		}
 		
-		// Grayscale
-		// Approximate runtime for width = 5000, windowWidth = 1000: 50ms
-		// Example: width = 5000, windowWidth = 1000
-		// Pixel 0 / 0 is calculated the following way:
-		// Go through Pixels [0-4] / [0-4], calculate the average color (gray) from the black and white colors.
-		// Paint Pixel 0 / 0 with this calculated shade of gray.
+		int[][] finalImage = grayscaling();
+		return toWritableImage(finalImage);
+	}
+	
+	// Scale image down from WIDTH * WIDTH to WINDOW_WIDTH * WINDOW_WIDTH.
+	// This smooths out the image considerably by using gray tones as colors.
+	// Example: width = 5000, windowWidth = 1000
+	// Approximate runtime: 50ms
+	// Pixel 0 / 0 is calculated the following way:
+	// Go through Pixels [0-4] / [0-4], calculate the average color (gray) from the black and white colors.
+	// Paint Pixel 0 / 0 with this calculated shade of gray.
+	private int[][] grayscaling() {
 		int scaleFactor = WIDTH / WINDOW_WIDTH;
 		int scaleFactorSquare = scaleFactor * scaleFactor;
 		int[][] finalImage = new int[WINDOW_WIDTH][WINDOW_WIDTH];
@@ -331,16 +336,18 @@ public class MandelbrotExplorer extends Application {
 				finalImage[x][y] = colorRgb;
 			}
 		}
-		
+		return finalImage;
+	}
+	
+	private WritableImage toWritableImage(int[][] image) {
 		WritableImage img = new WritableImage(WINDOW_WIDTH, WINDOW_WIDTH);
 		PixelWriter writer = img.getPixelWriter();
 		for (int x = 0; x < WINDOW_WIDTH; x++) {
 			for (int y = 0; y < WINDOW_WIDTH; y++) {
-				int colorRgb = finalImage[x][y];
+				int colorRgb = image[x][y];
 				writer.setColor(x, y, Color.rgb(colorRgb, colorRgb, colorRgb));
 			}
 		}
-		
 		return img;
 	}
 }
