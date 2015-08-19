@@ -62,9 +62,38 @@ public class MandelbrotExplorer extends Application {
 
 	// Program mode
 	private enum ProgramMode {
-		EXPLORER, SLIDE_SHOW
+		EXPLORER("Explorer"), SLIDE_SHOW("Slide Show");
+		
+		private final String name;
+		
+		private ProgramMode(String name) {
+			this.name = name;
+		}
+		
+		@Override
+		public String toString() {
+			return name;
+		}
 	}
 	private static final ProgramMode PROGRAM_MODE = ProgramMode.SLIDE_SHOW;
+	
+	// Slide show params
+//	private static final double SLIDE_SHOW_MIN_X = -2;
+//	private static final double SLIDE_SHOW_MAX_X = 1;
+//	private static final double SLIDE_SHOW_MIN_Y = -1.5;
+//	private static final double SLIDE_SHOW_MAX_Y = 1.5;
+	
+	private static final double SLIDE_SHOW_MIN_X = -0.7346060000000001;
+	private static final double SLIDE_SHOW_MAX_X = -0.72335;
+	private static final double SLIDE_SHOW_MIN_Y = -0.18867900000000007;
+	private static final double SLIDE_SHOW_MAX_Y = -0.17742300000000005;
+	
+	private static final double SLIDE_SHOW_MIN_STEP = 1 / Math.pow(10, 15);
+	private static final double SLIDE_SHOW_MAX_STEP = (SLIDE_SHOW_MAX_X - SLIDE_SHOW_MIN_X) / WIDTH;
+	
+	private static final int SLIDE_SHOW_INTERVAL_MS = 15000;
+	private static final boolean SLIDE_SHOW_SMALLER_STEPS = false;
+	private static final int SLIDE_SHOW_SMALLER_STEPS_POWER = 4;
 	
 	// Algorithm parameters
 	private static final int MAX_N = 500;
@@ -120,20 +149,6 @@ public class MandelbrotExplorer extends Application {
 	private Rectangle selection;
 	private boolean selectionStarted = false;
 	private Stack<MandelbrotState> history = new Stack<MandelbrotState>();
-	
-	// Slide show
-//	private static final double SLIDE_SHOW_MIN_X = -2;
-//	private static final double SLIDE_SHOW_MAX_X = 1;
-//	private static final double SLIDE_SHOW_MIN_Y = -1.5;
-//	private static final double SLIDE_SHOW_MAX_Y = 1.5;
-	
-	private static final double SLIDE_SHOW_MIN_X = -0.7346060000000001;
-	private static final double SLIDE_SHOW_MAX_X = -0.72335;
-	private static final double SLIDE_SHOW_MIN_Y = -0.18867900000000007;
-	private static final double SLIDE_SHOW_MAX_Y = -0.17742300000000005;
-	
-	private static final double SLIDE_SHOW_MIN_STEP = 1 / Math.pow(10, 15);
-	private static final double SLIDE_SHOW_MAX_STEP = (SLIDE_SHOW_MAX_X - SLIDE_SHOW_MIN_X) / WIDTH;
 	
 	public static void main(String[] args) {
 		launch(args);
@@ -284,7 +299,7 @@ public class MandelbrotExplorer extends Application {
             }
 		});
 		
-		primaryStage.setTitle("Mandelbrot Explorer");
+		primaryStage.setTitle("Mandelbrot " + PROGRAM_MODE);
 		primaryStage.setScene(scene);
 		primaryStage.show();
 		
@@ -296,7 +311,7 @@ public class MandelbrotExplorer extends Application {
 					Image img = calculateImageWrapper();
 					gc.drawImage(img, 0, 0);
 			    }
-			}, 5000, 5000);
+			}, 5000, SLIDE_SHOW_INTERVAL_MS);
 		}
 	}
 	
@@ -305,9 +320,10 @@ public class MandelbrotExplorer extends Application {
 	}
 
 	private Image calculateImageWrapper() {
-		System.out.println("Creating image for parameters minX=[" + minX
-				+ "], maxX=[" + maxX + "], minY=[" + minY + "], maxY=[" + maxY
-				+ "], step=[" + step + "]");
+		System.out.println("[" + System.currentTimeMillis()
+				+ "] Creating image for parameters minX=[" + minX + "], maxX=["
+				+ maxX + "], minY=[" + minY + "], maxY=[" + maxY + "], step=["
+				+ step + "]");
 		long start = System.currentTimeMillis();
 		image = new int[WIDTH][WIDTH];
 		Image img = calculateImage();
@@ -418,7 +434,9 @@ public class MandelbrotExplorer extends Application {
 			// get from a number in range 0..1 to 10^-15..6*10^-4
 			step = Math.random() * (SLIDE_SHOW_MAX_STEP - SLIDE_SHOW_MIN_STEP) + SLIDE_SHOW_MIN_STEP;
 			// Smaller steps can be more interesting. Smaller chance to find something exciting though.
-			//step /= Math.pow(10, Math.ceil(Math.random() * 10));
+			if (SLIDE_SHOW_SMALLER_STEPS) {
+				step /= Math.pow(10, Math.ceil(Math.random() * SLIDE_SHOW_SMALLER_STEPS_POWER));
+			}
 			
 			maxX = minX + step;
 			maxY = minY + step;
