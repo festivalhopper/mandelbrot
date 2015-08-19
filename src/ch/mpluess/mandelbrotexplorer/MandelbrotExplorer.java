@@ -13,12 +13,7 @@
 package ch.mpluess.mandelbrotexplorer;
 
 import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.util.EmptyStackException;
 import java.util.Stack;
 import java.util.concurrent.ExecutorService;
@@ -65,9 +60,6 @@ public class MandelbrotExplorer extends Application {
 	// Threading
 	private final int THREADS = 8;
 	private final int TIMEOUT_SECONDS = 60;
-	
-	// Caching
-	private final boolean DO_CACHING = false;
 	
 	////////
 	// State
@@ -305,33 +297,25 @@ public class MandelbrotExplorer extends Application {
 			throw new RuntimeException(e);
 		}
 		
-		//TODO Caching currently not faster than recalculating
-		int[][] finalImage;
-		if (DO_CACHING && isImageCached()) {
-			System.out.println("Reading image from cache.");
-			finalImage = readCachedImage();
-		}
-		else {
-			// Grayscale
-			// Approximate runtime for width = 5000, windowWidth = 1000: 50ms
-			// Example: width = 5000, windowWidth = 1000
-			// Pixel 0 / 0 is calculated the following way:
-			// Go through Pixels [0-4] / [0-4], calculate the average color (gray) from the black and white colors.
-			// Paint Pixel 0 / 0 with this calculated shade of gray.
-			int scaleFactor = WIDTH / WINDOW_WIDTH;
-			int scaleFactorSquare = scaleFactor * scaleFactor;
-			finalImage = new int[WINDOW_WIDTH][WINDOW_WIDTH];
-			for (int x = 0; x < WINDOW_WIDTH; x++) {
-				for (int y = 0; y < WINDOW_WIDTH; y++) {
-					int colorSum = 0;
-					for (int xImage = x * scaleFactor; xImage < (x * scaleFactor + scaleFactor); xImage++) {
-						for (int yImage = y * scaleFactor; yImage < (y * scaleFactor + scaleFactor); yImage++) {
-							colorSum += image[xImage][yImage];
-						}
+		// Grayscale
+		// Approximate runtime for width = 5000, windowWidth = 1000: 50ms
+		// Example: width = 5000, windowWidth = 1000
+		// Pixel 0 / 0 is calculated the following way:
+		// Go through Pixels [0-4] / [0-4], calculate the average color (gray) from the black and white colors.
+		// Paint Pixel 0 / 0 with this calculated shade of gray.
+		int scaleFactor = WIDTH / WINDOW_WIDTH;
+		int scaleFactorSquare = scaleFactor * scaleFactor;
+		int[][] finalImage = new int[WINDOW_WIDTH][WINDOW_WIDTH];
+		for (int x = 0; x < WINDOW_WIDTH; x++) {
+			for (int y = 0; y < WINDOW_WIDTH; y++) {
+				int colorSum = 0;
+				for (int xImage = x * scaleFactor; xImage < (x * scaleFactor + scaleFactor); xImage++) {
+					for (int yImage = y * scaleFactor; yImage < (y * scaleFactor + scaleFactor); yImage++) {
+						colorSum += image[xImage][yImage];
 					}
-					int colorRgb = (int)(((double)colorSum) / scaleFactorSquare * 255);
-					finalImage[x][y] = colorRgb;
 				}
+				int colorRgb = (int)(((double)colorSum) / scaleFactorSquare * 255);
+				finalImage[x][y] = colorRgb;
 			}
 		}
 		
@@ -344,55 +328,6 @@ public class MandelbrotExplorer extends Application {
 			}
 		}
 		
-		if (DO_CACHING) {
-			cacheImage(finalImage);
-		}
-		
 		return img;
-	}
-	
-	private boolean isImageCached() {
-		return new File(getCachedImagePath()).exists();
-	}
-	
-	private boolean isImageCached(String path) {
-		return new File(path).exists();
-	}
-	
-	private void cacheImage(int[][] image) {
-		String path = getCachedImagePath();
-		if (!isImageCached(path)) {
-			System.out.println("Caching image.");
-			try {
-				FileOutputStream fos = new FileOutputStream(path);
-				ObjectOutputStream out = new ObjectOutputStream(fos);
-				out.writeObject(image);
-				out.flush();
-				out.close();
-			} catch (IOException e) {
-				throw new RuntimeException(e);
-			}
-		}
-	}
-	
-	private int[][] readCachedImage() {
-		FileInputStream fis;
-		try {
-			fis = new FileInputStream(getCachedImagePath());
-			ObjectInputStream in = new ObjectInputStream(fis);
-			int[][] cachedImage = (int[][])in.readObject();
-			in.close();
-			return cachedImage;
-		} catch (FileNotFoundException e) {
-			throw new RuntimeException(e);
-		} catch (IOException e) {
-			throw new RuntimeException(e);
-		} catch (ClassNotFoundException e) {
-			throw new RuntimeException(e);
-		}
-	}
-	
-	private String getCachedImagePath() {
-		return "image_cache/" + WIDTH + "_" + minX + "_" + maxX + "_" + minY + "_" + maxY + ".dat";
 	}
 }
