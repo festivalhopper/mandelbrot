@@ -32,6 +32,8 @@ import javafx.scene.Group;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
+import javafx.scene.image.Image;
+import javafx.scene.image.PixelWriter;
 import javafx.scene.image.WritableImage;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseButton;
@@ -217,7 +219,7 @@ public class MandelbrotExplorer extends Application {
             	// screenshot
             	if (event.getCharacter().equalsIgnoreCase("s")) {
             		WritableImage img = new WritableImage(WINDOW_WIDTH, WINDOW_WIDTH);
-					gc.getCanvas().snapshot(null, img);
+					canvas.snapshot(null, img);
 					File file = new File("screenshots/" + System.currentTimeMillis() + ".png");
 					try {
 						ImageIO.write(SwingFXUtils.fromFXImage(img, null), "png", file);
@@ -244,11 +246,12 @@ public class MandelbrotExplorer extends Application {
 				+ "], stepX=[" + stepX + "], stepY=[" + stepY + "]");
 		long start = System.currentTimeMillis();
 		image = new int[WIDTH][WIDTH];
-		calculateImage(gc);
+		Image img = calculateImage();
+		gc.drawImage(img, 0, 0);
 		System.out.println("Image created in " + (System.currentTimeMillis() - start) + "ms.");
 	}
 	
-	private void calculateImage(GraphicsContext gc) {
+	private Image calculateImage() {
 		assert WIDTH % WINDOW_WIDTH == 0;
 		
 		ExecutorService executorService = Executors.newFixedThreadPool(THREADS);
@@ -332,19 +335,20 @@ public class MandelbrotExplorer extends Application {
 			}
 		}
 		
-		System.out.println(System.currentTimeMillis());
+		WritableImage img = new WritableImage(WINDOW_WIDTH, WINDOW_WIDTH);
+		PixelWriter writer = img.getPixelWriter();
 		for (int x = 0; x < WINDOW_WIDTH; x++) {
 			for (int y = 0; y < WINDOW_WIDTH; y++) {
 				int colorRgb = finalImage[x][y];
-				gc.setFill(Color.rgb(colorRgb, colorRgb, colorRgb));
-				gc.fillRect(x, y, 1, 1);
+				writer.setColor(x, y, Color.rgb(colorRgb, colorRgb, colorRgb));
 			}
 		}
-		System.out.println(System.currentTimeMillis());
 		
 		if (DO_CACHING) {
 			cacheImage(finalImage);
 		}
+		
+		return img;
 	}
 	
 	private boolean isImageCached() {
