@@ -36,7 +36,9 @@ import javafx.scene.image.WritableImage;
 import javafx.scene.input.KeyEvent;
 import javafx.scene.input.MouseButton;
 import javafx.scene.input.MouseEvent;
+import javafx.scene.layout.Pane;
 import javafx.scene.paint.Color;
+import javafx.scene.shape.Rectangle;
 import javafx.stage.Stage;
 
 import javax.imageio.ImageIO;
@@ -70,6 +72,7 @@ public class MandelbrotExplorer extends Application {
 	
 	private double sceneXPressed;
 	private double sceneYPressed;
+	private boolean selectionStarted = false;
 	
 	// Initial complex number range
 	
@@ -115,12 +118,34 @@ public class MandelbrotExplorer extends Application {
 		GraphicsContext gc = canvas.getGraphicsContext2D();
 		updateImage(gc);
 		
+		Pane glassPane = new Pane();
+		// opacity = 0.0 --> transparent "glass pane"
+		glassPane.setStyle("-fx-background-color: rgba(255, 255, 255, 0.0);");
+		glassPane.setMaxWidth(WINDOW_WIDTH);
+		glassPane.setMaxHeight(WINDOW_WIDTH);
+		Rectangle selection = new Rectangle();
+		selection.setFill(Color.TRANSPARENT);
+		selection.setStroke(Color.GREY);
+		
 		canvas.setOnMousePressed(new EventHandler<MouseEvent>() {
 			@Override
 			public void handle(MouseEvent event) {
 				if (event.getButton() == MouseButton.PRIMARY) {
 					sceneXPressed = event.getSceneX();
 					sceneYPressed = event.getSceneY();
+					selectionStarted = true;
+					selection.setX(sceneXPressed);
+					selection.setY(sceneYPressed);
+					glassPane.getChildren().add(selection);
+				}
+			}
+		});
+		canvas.setOnMouseDragged(new EventHandler<MouseEvent>() {
+			@Override
+			public void handle(MouseEvent event) {
+				if (selectionStarted) {
+					selection.setWidth(event.getSceneX() - sceneXPressed);
+					selection.setHeight(event.getSceneY() - sceneYPressed);
 				}
 			}
 		});
@@ -128,6 +153,10 @@ public class MandelbrotExplorer extends Application {
 			@Override
 			public void handle(MouseEvent event) {
 				if (event.getButton() == MouseButton.PRIMARY) {
+					selectionStarted = false;
+					glassPane.getChildren().remove(selection);
+					selection.setWidth(0);
+					selection.setHeight(0);
 					history.push(new MandelbrotState(minX, maxX, minY, maxY, stepX, stepY));
 					
 					double minXOrig = minX;
@@ -179,7 +208,8 @@ public class MandelbrotExplorer extends Application {
 				}
 			}
 		});
-		root.getChildren().add(canvas);
+		
+		root.getChildren().addAll(canvas, glassPane);
 		
 		Scene scene = new Scene(root);
 		scene.setOnKeyTyped(new EventHandler<KeyEvent>() {
@@ -302,6 +332,7 @@ public class MandelbrotExplorer extends Application {
 			}
 		}
 		
+		System.out.println(System.currentTimeMillis());
 		for (int x = 0; x < WINDOW_WIDTH; x++) {
 			for (int y = 0; y < WINDOW_WIDTH; y++) {
 				int colorRgb = finalImage[x][y];
@@ -309,6 +340,7 @@ public class MandelbrotExplorer extends Application {
 				gc.fillRect(x, y, 1, 1);
 			}
 		}
+		System.out.println(System.currentTimeMillis());
 		
 		if (DO_CACHING) {
 			cacheImage(finalImage);
