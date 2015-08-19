@@ -64,8 +64,7 @@ public class MandelbrotExplorer extends Application {
 	////////
 	// State
 	
-	private double sceneXPressed;
-	private double sceneYPressed;
+	private Rectangle selection;
 	private boolean selectionStarted = false;
 	
 	// Initial complex number range
@@ -117,7 +116,7 @@ public class MandelbrotExplorer extends Application {
 		glassPane.setStyle("-fx-background-color: rgba(255, 255, 255, 0.0);");
 		glassPane.setMaxWidth(WINDOW_WIDTH);
 		glassPane.setMaxHeight(WINDOW_WIDTH);
-		Rectangle selection = new Rectangle();
+		selection = new Rectangle();
 		selection.setFill(Color.TRANSPARENT);
 		selection.setStroke(Color.GREY);
 		
@@ -125,11 +124,9 @@ public class MandelbrotExplorer extends Application {
 			@Override
 			public void handle(MouseEvent event) {
 				if (event.getButton() == MouseButton.PRIMARY) {
-					sceneXPressed = event.getSceneX();
-					sceneYPressed = event.getSceneY();
 					selectionStarted = true;
-					selection.setX(sceneXPressed);
-					selection.setY(sceneYPressed);
+					selection.setX(event.getSceneX());
+					selection.setY(event.getSceneY());
 					glassPane.getChildren().add(selection);
 				}
 			}
@@ -138,8 +135,25 @@ public class MandelbrotExplorer extends Application {
 			@Override
 			public void handle(MouseEvent event) {
 				if (selectionStarted) {
-					selection.setWidth(event.getSceneX() - sceneXPressed);
-					selection.setHeight(event.getSceneY() - sceneYPressed);
+					double dx = event.getSceneX() - selection.getX();
+					if (dx < 0) {
+						selection.setTranslateX(dx);
+						selection.setWidth(-dx);
+					}
+					else {
+						selection.setTranslateX(0);
+						selection.setWidth(dx);
+					}
+					
+					double dy = event.getSceneY() - selection.getY();
+					if (dy < 0) {
+						selection.setTranslateY(dy);
+						selection.setHeight(-dy);
+					}
+					else {
+						selection.setTranslateY(0);
+						selection.setHeight(dy);
+					}
 				}
 			}
 		});
@@ -149,34 +163,36 @@ public class MandelbrotExplorer extends Application {
 				if (event.getButton() == MouseButton.PRIMARY) {
 					selectionStarted = false;
 					glassPane.getChildren().remove(selection);
+					
+					// + 1 because the coordinates start from 0, not 1
+					double selectionX = selection.getX() + selection.getTranslateX() + 1;
+					double selectionY = selection.getY() + selection.getTranslateY() + 1;
+					double selectionWidth = selection.getWidth();
+					double selectionHeight = selection.getHeight();
+					
+					// this makes sure the old rectangle doesn't pop up on the next selection
 					selection.setWidth(0);
 					selection.setHeight(0);
+					
 					history.push(new MandelbrotState(minX, maxX, minY, maxY, stepX, stepY));
 					
-					double minXOrig = minX;
-					double minYOrig = minY;
-					double sceneXReleased = event.getSceneX();
-					double sceneYReleased = event.getSceneY();
-					
-					minX += (sceneXPressed + 1) / WINDOW_WIDTH * (maxX - minX);
-					minY += (sceneYPressed + 1) / WINDOW_WIDTH * (maxY - minY);
-					
-					// Adjust image to be square.
-					// Adjust to the short side of the rectangle drawn by the user.
-					if ((sceneXReleased - sceneXPressed) > (sceneYReleased - sceneYPressed)) {
-						maxX -= (WINDOW_WIDTH - (sceneYReleased - sceneYPressed + sceneXPressed) + 1) / WINDOW_WIDTH * (maxX - minXOrig);
-						maxY -= (WINDOW_WIDTH - sceneYReleased + 1) / WINDOW_WIDTH * (maxY - minYOrig);
-					}
-					else if ((sceneXReleased - sceneXPressed) < (sceneYReleased - sceneYPressed)) {
-						maxX -= (WINDOW_WIDTH - sceneXReleased + 1) / WINDOW_WIDTH * (maxX - minXOrig);
-						maxY -= (WINDOW_WIDTH - (sceneXReleased - sceneXPressed + sceneYPressed) + 1) / WINDOW_WIDTH * (maxY - minYOrig);
+					// transform the selection from a rectangle to a square, take the shorter side
+					if (selectionWidth < selectionHeight) {
+						selectionHeight = selectionWidth;
 					}
 					else {
-						maxX -= (WINDOW_WIDTH - sceneXReleased + 1) / WINDOW_WIDTH * (maxX - minXOrig);
-						maxY -= (WINDOW_WIDTH - sceneYReleased + 1) / WINDOW_WIDTH * (maxY - minYOrig);
+						selectionWidth = selectionHeight;
 					}
 					
+					// adjust complex number range to the selection
+					double xRange = maxX - minX;
+					double yRange = maxY - minY;
+					minX += (selectionX) / WINDOW_WIDTH * xRange;
+					minY += (selectionY) / WINDOW_WIDTH * yRange;
+					maxX -= (WINDOW_WIDTH - (selectionX + selectionWidth)) / WINDOW_WIDTH * xRange;
+					maxY -= (WINDOW_WIDTH - (selectionY + selectionHeight)) / WINDOW_WIDTH * yRange;
 					updateSteps();
+
 					updateImage(gc);
 				}
 			}
@@ -256,7 +272,7 @@ public class MandelbrotExplorer extends Application {
 						double cy = minY;
 						for (int y = 0; y < WIDTH; y++) {
 							// Bounded = member of the Mandelbrot set
-							if (!isBoundless(cx, cy)) {
+							if (isMemberOfMandelbrotSet(cx, cy)) {
 								// black
 								image[x][y] = 0;
 							} else {
@@ -269,7 +285,7 @@ public class MandelbrotExplorer extends Application {
 					}
 			    }
 			    
-			    private boolean isBoundless(double cx, double cy) {
+			    private boolean isMemberOfMandelbrotSet(double cx, double cy) {
 					double zx = 0;
 					double zy = 0;
 					int n = 0;
@@ -282,7 +298,7 @@ public class MandelbrotExplorer extends Application {
 
 						++n;
 					}
-					return n != MAX_N;
+					return n == MAX_N;
 				}
 			});
 		}
