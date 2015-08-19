@@ -43,22 +43,26 @@ public class MandelbrotExplorer extends Application {
 	/////////
 	// Config
 	
+	// Display
+	
 	// Window size (square)
-	private final int WINDOW_WIDTH = 1000;
+	private static final int WINDOW_WIDTH = 1000;
 	
 	// Image size (square, decides over the computing time needed)
 	// Image is then scaled down to window size.
 	// 5000 makes for a real nice image.
 	// 3000 is comparable in dense areas, clearly worse in sparse areas.
-	private final int WIDTH = 5000;
+	private static final int WIDTH = 5000;
+	
+	private static final boolean INVERT_COLORS = false;
 
 	// Algorithm parameters
-	private final int MAX_N = 500;
-	private final int MAX_VALUE_SQUARE = 4;
+	private static final int MAX_N = 500;
+	private static final int MAX_VALUE_SQUARE = 4;
 	
 	// Threading
-	private final int THREADS = 8;
-	private final int TIMEOUT_SECONDS = 60;
+	private static final int THREADS = 8;
+	private static final int TIMEOUT_SECONDS = 60;
 	
 	////////
 	// State
@@ -93,6 +97,20 @@ public class MandelbrotExplorer extends Application {
 	private Stack<MandelbrotState> history = new Stack<MandelbrotState>();
 	
 	private volatile int[][] image;
+	
+	private static final int mandelbrotColor;
+	private static final int nonMandelbrotColor;
+	static {
+		// black = 0, white = 1
+		if (INVERT_COLORS) {
+			mandelbrotColor = 1;
+			nonMandelbrotColor = 0;
+		}
+		else {
+			mandelbrotColor = 0;
+			nonMandelbrotColor = 1;
+		}
+	}
 	
 	public static void main(String[] args) {
 		launch(args);
@@ -269,11 +287,9 @@ public class MandelbrotExplorer extends Application {
 						for (int y = 0; y < WIDTH; y++) {
 							// Bounded = member of the Mandelbrot set
 							if (isMemberOfMandelbrotSet(cx, cy)) {
-								// black
-								image[x][y] = 0;
+								image[x][y] = mandelbrotColor;
 							} else {
-								// white
-								image[x][y] = 1;
+								image[x][y] = nonMandelbrotColor;
 							}
 							cy += stepY;
 						}
