@@ -202,7 +202,7 @@ public class MandelbrotExplorer extends Application {
 			public void handle(MouseEvent event) {
 				// go back to last image
 				if (event.getButton() == MouseButton.SECONDARY) {
-					try {
+					if (!history.empty()) {
 						MandelbrotState state = history.pop();
 						minX = state.minX;
 						maxX = state.maxX;
@@ -211,9 +211,6 @@ public class MandelbrotExplorer extends Application {
 						stepX = state.stepX;
 						stepY = state.stepY;
 						updateImage(gc);
-					}
-					catch (EmptyStackException e) {
-						return;
 					}
 				}
 			}
