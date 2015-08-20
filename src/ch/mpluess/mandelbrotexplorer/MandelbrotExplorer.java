@@ -304,6 +304,8 @@ public class MandelbrotExplorer extends Application {
 		primaryStage.show();
 		
 		if (PROGRAM_MODE.equals(ProgramMode.SLIDE_SHOW)) {
+			// Unfortunately, the delay is based on the start time of the
+			// last TimerTask, not on its end time.
 			new Timer().schedule(new TimerTask() {
 			    @Override
 			    public void run() {
