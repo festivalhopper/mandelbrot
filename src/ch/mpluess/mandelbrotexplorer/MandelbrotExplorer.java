@@ -58,7 +58,7 @@ public class MandelbrotExplorer extends Application {
 	// 3000 is comparable in dense areas, clearly worse in sparse areas.
 	private static final int WIDTH = 5000;
 	
-	private static final boolean INVERT_COLORS = false;
+	private static final boolean INVERT_COLORS = true;
 
 	// Program mode
 	private enum ProgramMode {
@@ -75,7 +75,7 @@ public class MandelbrotExplorer extends Application {
 			return name;
 		}
 	}
-	private static final ProgramMode PROGRAM_MODE = ProgramMode.SLIDE_SHOW;
+	private static final ProgramMode PROGRAM_MODE = ProgramMode.EXPLORER;
 	
 	// Slide show params
 //	private static final double SLIDE_SHOW_MIN_X = -2;
@@ -110,10 +110,18 @@ public class MandelbrotExplorer extends Application {
 	// Not using the MandelbrotState class here for performance reasons.
 	
 	// Standard Mandelbrot range
-	private double minX = -2;
-	private double maxX = 1;
-	private double minY = -1.5;
-	private double maxY = 1.5;
+//	private double minX = -2;
+//	private double maxX = 1;
+//	private double minY = -1.5;
+//	private double maxY = 1.5;
+	
+	// Try this, crazy stuff. Invert it.
+	// chaos valley
+	// tal vo trina und pluess
+	private double minX = -1.2535750159999999;
+	private double maxX = -1.2533004799999998;
+	private double minY = -0.021433680000000017;
+	private double maxY = -0.02115914400000002;
 	
 	// "Tal der Seepferdchen"
 //	private double minX = -1;
@@ -285,6 +293,7 @@ public class MandelbrotExplorer extends Application {
 		scene.setOnKeyTyped(new EventHandler<KeyEvent>() {
             public void handle(KeyEvent event) {
             	// screenshot
+            	// TODO save full resolution
             	if (event.getCharacter().equalsIgnoreCase("s")) {
             		WritableImage img = new WritableImage(WINDOW_WIDTH, WINDOW_WIDTH);
 					canvas.snapshot(null, img);
