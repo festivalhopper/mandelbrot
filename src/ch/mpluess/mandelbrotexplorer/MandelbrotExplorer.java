@@ -50,15 +50,15 @@ public class MandelbrotExplorer extends Application {
 	// Display
 	
 	// Window size (square)
-	private static final int WINDOW_WIDTH = 1000;
+	private static final int WINDOW_WIDTH = 960;
 	
 	// Image size (square, decides over the computing time needed)
 	// Image is then scaled down to window size.
 	// 5000 makes for a real nice image.
 	// 3000 is comparable in dense areas, clearly worse in sparse areas.
-	private static final int WIDTH = 5000;
+	private static final int WIDTH = 4800;
 	
-	private static final boolean INVERT_COLORS = true;
+	private static final boolean INVERT_COLORS = false;
 
 	// Program mode
 	private enum ProgramMode {
@@ -115,13 +115,18 @@ public class MandelbrotExplorer extends Application {
 //	private double minY = -1.5;
 //	private double maxY = 1.5;
 	
+	private double minX = -2;
+	private double maxX = 2;
+	private double minY = -2;
+	private double maxY = 2;
+	
 	// Try this, crazy stuff. Invert it.
 	// chaos valley
 	// tal vo trina und pluess
-	private double minX = -1.2535750159999999;
-	private double maxX = -1.2533004799999998;
-	private double minY = -0.021433680000000017;
-	private double maxY = -0.02115914400000002;
+//	private double minX = -1.2535750159999999;
+//	private double maxX = -1.2533004799999998;
+//	private double minY = -0.021433680000000017;
+//	private double maxY = -0.02115914400000002;
 	
 	// "Tal der Seepferdchen"
 //	private double minX = -1;
@@ -176,7 +181,7 @@ public class MandelbrotExplorer extends Application {
 		// JavaFX init
 		Canvas canvas = new Canvas(WINDOW_WIDTH, WINDOW_WIDTH);
 		GraphicsContext gc = canvas.getGraphicsContext2D();
-		gc.drawImage(calculateImageWrapper(), 0, 0);
+		drawAndCalculateImageWrapper(gc);
 		
 		Group root = new Group();
 		root.getChildren().add(canvas);
@@ -266,7 +271,7 @@ public class MandelbrotExplorer extends Application {
 						maxY -= (WINDOW_WIDTH - (selectionY + selectionHeight)) / WINDOW_WIDTH * yRange;
 						updateSteps();
 	
-						gc.drawImage(calculateImageWrapper(), 0, 0);
+						drawAndCalculateImageWrapper(gc);
 					}
 				}
 			});
@@ -282,7 +287,8 @@ public class MandelbrotExplorer extends Application {
 							minY = state.minY;
 							maxY = state.maxY;
 							step = state.step;
-							gc.drawImage(calculateImageWrapper(), 0, 0);
+							
+							drawAndCalculateImageWrapper(gc);
 						}
 					}
 				}
@@ -319,8 +325,7 @@ public class MandelbrotExplorer extends Application {
 			    @Override
 			    public void run() {
 					generateRandomState();
-					Image img = calculateImageWrapper();
-					gc.drawImage(img, 0, 0);
+					drawAndCalculateImageWrapper(gc);
 			    }
 			}, 5000, SLIDE_SHOW_INTERVAL_MS);
 		}
@@ -342,9 +347,17 @@ public class MandelbrotExplorer extends Application {
 		return img;
 	}
 	
+	private void drawAndCalculateImageWrapper(GraphicsContext gc) {
+		long start = System.currentTimeMillis();
+		gc.drawImage(calculateImageWrapper(), 0, 0);
+		System.out.println("Image created and drawn in "
+				+ (System.currentTimeMillis() - start) + "ms.");
+	}
+	
 	private Image calculateImage() {
 		assert WIDTH % WINDOW_WIDTH == 0;
 		
+		long start = System.currentTimeMillis();
 		ExecutorService executorService = Executors.newFixedThreadPool(THREADS);
 		for (int i = 0; i < THREADS; i++) {
 			final int threadNumber = i;
@@ -394,8 +407,18 @@ public class MandelbrotExplorer extends Application {
 			throw new RuntimeException(e);
 		}
 		
-		int[][] finalImage = grayscaling();
-		return toWritableImage(finalImage);
+		System.out.println("Image calculated in "
+				+ (System.currentTimeMillis() - start) + "ms.");
+		
+		int[][] finalImage = interpolate();
+		System.out.println("Image calculated and interpolated in "
+				+ (System.currentTimeMillis() - start) + "ms.");
+		
+		WritableImage image = toWritableImage(finalImage);
+		System.out.println("Image calculated, interpolated and converted in "
+				+ (System.currentTimeMillis() - start) + "ms.");
+		
+		return image;
 	}
 	
 	// Scale image down from WIDTH * WIDTH to WINDOW_WIDTH * WINDOW_WIDTH.
@@ -405,7 +428,7 @@ public class MandelbrotExplorer extends Application {
 	// Pixel 0 / 0 is calculated the following way:
 	// Go through Pixels [0-4] / [0-4], calculate the average color (gray) from the black and white colors.
 	// Paint Pixel 0 / 0 with this calculated shade of gray.
-	private int[][] grayscaling() {
+	private int[][] interpolate() {
 		int scaleFactor = WIDTH / WINDOW_WIDTH;
 		int scaleFactorSquare = scaleFactor * scaleFactor;
 		int[][] finalImage = new int[WINDOW_WIDTH][WINDOW_WIDTH];
