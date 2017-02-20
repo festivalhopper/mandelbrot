@@ -58,7 +58,7 @@ public class MandelbrotExplorer extends Application {
 	// 3000 is comparable in dense areas, clearly worse in sparse areas.
 	private static final int WIDTH = 5000;
 	
-	private static final boolean INVERT_COLORS = true;
+	private static final boolean INVERT_COLORS = false;
 
 	// Program mode
 	private enum ProgramMode {
@@ -110,18 +110,18 @@ public class MandelbrotExplorer extends Application {
 	// Not using the MandelbrotState class here for performance reasons.
 	
 	// Standard Mandelbrot range
-//	private double minX = -2;
-//	private double maxX = 1;
-//	private double minY = -1.5;
-//	private double maxY = 1.5;
+	private double minX = -2;
+	private double maxX = 1;
+	private double minY = -1.5;
+	private double maxY = 1.5;
 	
 	// Try this, crazy stuff. Invert it.
 	// chaos valley
 	// tal vo trina und pluess
-	private double minX = -1.2535750159999999;
-	private double maxX = -1.2533004799999998;
-	private double minY = -0.021433680000000017;
-	private double maxY = -0.02115914400000002;
+//	private double minX = -1.2535750159999999;
+//	private double maxX = -1.2533004799999998;
+//	private double minY = -0.021433680000000017;
+//	private double maxY = -0.02115914400000002;
 	
 	// "Tal der Seepferdchen"
 //	private double minX = -1;
@@ -139,17 +139,17 @@ public class MandelbrotExplorer extends Application {
 	
 	private volatile int[][] image;
 	
-	private static final int mandelbrotColor;
-	private static final int nonMandelbrotColor;
+	private static final int MANDELBROT_COLOR;
+	private static final int NON_MANDELBROT_COLOR;
 	static {
 		// black = 0, white = 1
 		if (INVERT_COLORS) {
-			mandelbrotColor = 1;
-			nonMandelbrotColor = 0;
+			MANDELBROT_COLOR = 1;
+			NON_MANDELBROT_COLOR = 0;
 		}
 		else {
-			mandelbrotColor = 0;
-			nonMandelbrotColor = 1;
+			MANDELBROT_COLOR = 0;
+			NON_MANDELBROT_COLOR = 1;
 		}
 	}
 	
@@ -356,9 +356,9 @@ public class MandelbrotExplorer extends Application {
 						for (int y = 0; y < WIDTH; y++) {
 							// Bounded = member of the Mandelbrot set
 							if (isMemberOfMandelbrotSet(cx, cy)) {
-								image[x][y] = mandelbrotColor;
+								image[x][y] = MANDELBROT_COLOR;
 							} else {
-								image[x][y] = nonMandelbrotColor;
+								image[x][y] = NON_MANDELBROT_COLOR;
 							}
 							cy += step;
 						}
